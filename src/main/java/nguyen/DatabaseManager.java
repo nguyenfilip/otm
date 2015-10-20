@@ -73,13 +73,15 @@ public class DatabaseManager {
 		try {
 			st.execute("DROP TABLE address");
 			st.execute("DROP TABLE person");
+			dropFkIndex();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		st.execute("CREATE TABLE person(id SERIAL PRIMARY KEY, name varchar(40))");
 		st.execute(
 				"CREATE TABLE address(id SERIAL PRIMARY KEY, person_id integer REFERENCES person(id), street varchar(40))");
-
+		createfkIndex();
+		
 		PreparedStatement personInsert = con.prepareStatement("INSERT INTO person values(?,?)");
 		PreparedStatement address = con.prepareStatement("INSERT INTO address (person_id, street) values(?,?)");
 		for (int i = 0; i < PERSON_COUNT; i++) {
@@ -116,7 +118,25 @@ public class DatabaseManager {
 		}
 
 	}
+	public String getPlan(QueryStrategy queryStrategy, List<Integer> ids) throws SQLException {
+		Connection con = null;
+		try {
+			con = ds.getConnection();
+			Statement st = con.createStatement();
 
+			st.executeQuery("EXPLAIN (ANALYZE ON, VERBOSE ON, COSTS ON, TIMING ON, FORMAT TEXT) ("
+					+ queryStrategy.createQuery(ids) + " )");
+
+			
+			StringBuilder sb = new StringBuilder();
+			ResultSet rs = st.getResultSet();
+			while (rs.next())
+				sb.append(rs.getString(1)+"\n");
+			return sb.toString();
+		} finally {
+			con.close();
+		}
+	}
 	private QueryExplanation buildExplanation(ResultSet resultSet) throws SQLException {
 		ResultSetMetaData metadata = resultSet.getMetaData();
 		String json = null;
@@ -130,5 +150,7 @@ public class DatabaseManager {
 		}
 		return new QueryExplanation(json);
 	}
+
+
 
 }
