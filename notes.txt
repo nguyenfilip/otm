@@ -1,0 +1,12 @@
+sudo su postgres
+createuser otmuser
+createdb -O otmuser otmdb
+
+psql -U otmuser otmdatabase
+\password
+/etc/postgresql/9.3/main/pg_hba.conf
+sudo service postgresql restart
+\l
+local  all   all          trust
+sudo service --status-all
+http://www.postgresql.org/docs/9.3/static/sql-createtable.html
