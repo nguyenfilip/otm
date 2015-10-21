@@ -1,4 +1,7 @@
+Results of running strategies against 1000 people each having 100-150 addresses. X axis is length of input and Y is query execution time in seconds.
+
 ![initial results](https://github.com/nguyenfilip/otm/blob/master/graphs/initial-results.png)
+
 ## ExistsStrategy ##
 ```
 Nested Loop  (cost=3.20..91.52 rows=1 width=9) (actual time=0.074..0.074 rows=0 loops=1)
