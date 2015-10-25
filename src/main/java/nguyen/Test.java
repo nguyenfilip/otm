@@ -23,7 +23,7 @@ public class Test {
 		strategies.add(new GroupByStrategy());
 		strategies.add(new IntersectStrategy());
 
-		// dbm.createfkIndex();
+//		 dbm.dropFkIndex();
 		for (QueryStrategy strategy : strategies) {
 			System.out.println("****************************************");
 			System.out.println(strategy.getClass().getSimpleName());

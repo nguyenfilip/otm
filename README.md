@@ -1,6 +1,88 @@
-Results of running strategies against 1000 people each having 100-150 addresses. X axis is length of input and Y is query execution time in seconds.
+# Introduction #
+This post is focused on RDMBS query performance for a simple database schema. The schema is just 1:N relationship, modeled using foreign key (see image1). This specific example uses person and address tables. Address table contains person\_fk foreign key, without an index on this column. The business requirement for a query on this schema is: find all records from Person table such that they have at least a specified set of addresses. The set of addresses is a set of database identifiers of those addresses (it doesn't really matter). This input set may vary in size.
+![schema](https://github.com/nguyenfilip/otm/blob/master/pics/schema.png)
 
-![initial results](https://github.com/nguyenfilip/otm/blob/master/graphs/initial-results.png)
+## Query Strategies ##
+The business requirement can be solved using several, very different, queries. The three strategies considered are: 
+  * Usage of INTERSECT operator
+  * Correlated Exists Subqueries
+  * Group by with Having clause
+Now, lets explain the three strategies one by one. 
+The most intuitive is INTERSECT. The idea is that for each address you will construct a select that will search for people with that address. For example searching for people that have set of addresses {126, 127} the query looks like this: 
+```sql
+ SELECT * 
+ FROM person p LEFT JOIN address a on p.id=a.person_fk
+ WHERE a.id=126
+
+INTERSECT
+
+ SELECT * 
+ FROM person p LEFT JOIN address a on p.id=a.person_fk
+ WHERE a.id=127
+```
+The second strategy correlated exists subqueries is using 1 subquery for each address. The idea is to use EXISTS(q) SQL function. This function returns true if and only if the parameter q is a query that returns some rows. Again searching for people with {126, 127} would look like this: 
+```sql
+ SELECT * FROM person p 
+ WHERE 
+   EXISTS ( SELECT * FROM address a WHERE a.person_fk = p.id AND a.id=126 ) AND
+   EXISTS ( SELECT * FROM address a WHERE a.person_fk = p.id AND a.id=127 )
+```
+The third strategy is more tricky. Assume you have 3 people with a few addresses. After you create a JOIN you will end up with something like this:
+
+ Person Name   | Address Name  |       
+------------- |---------------| 
+Filip         | Prague        | 
+Filip         | Brno          | 
+Filip         | London        | 
+Matej         | Prague        | 
+Matej         | London        | 
+Marek         | London        | 
+Marek         | Brno          | 
+
+If we want to search for {Prague, London} then what we can do is to filter out (using OR) only those that have at least 1 of these addresses: 
+
+Person Name   | Address Name  |       
+------------- |---------------| 
+Filip         | Prague        | 
+Filip         | London        | 
+Matej         | Prague        | 
+Matej         | London        | 
+Marek         | London        | 
+
+If we now group by this result by person and  count the addresses we will have aggregation like this:
+
+Person Name   | Address count  |       
+------------- |----------------| 
+Filip         | 2              | 
+Matej         | 2              | 
+Marek         | 1              | 
+
+So now if we just filter out (using HAVING) those that have at least the size of the input set (2 cities) we correctly end up with Filip and Matej. The SQL query looks like this: 
+```sql
+ SELECT p.name, count(*) FROM person p LEFT JOIN address a ON p.id = a.person_id
+ WHERE a.name = 'Prague' OR a.name='London'
+ GROUP BY p.name
+ HAVING count(*) = 2
+```
+
+
+# Experiment #
+I run the three query strategies against PostgreSQL database. The schema consists of 2 tables person and address: 
+
+```sql
+  CREATE TABLE person(id SERIAL PRIMARY KEY, name varchar(40))
+  CREATE TABLE address(id SERIAL PRIMARY KEY, person_id integer REFERENCES person(id), street varchar(40))
+```
+Person table is populated with 20000 records and for each person record there is randomized number of addresses in address table (100-200 records).
+
+I have run EXPLAIN ANALYZE on the database server for different input lenghts. Input length is a lenght of a set of addresses that we search for. So for example if the input length is 5 it means that each of the three queries is used to search people that have a specific set 5 addresses. Obviously increasing the size of this set will also increase query times.
+
+![20k](https://github.com/nguyenfilip/otm/blob/master/graphs/20k.png)
+
+The graph shows that exists strategy and intersect are fairly close with this dataset size. Note we have not used a foreign key on the person\_fk column. The interesting thing here is that adding that index doesn't seem to change the results significantly. Another interesting thing is that with smaller dataset size (1000 records in person table) the EXISTS strategy has significantly better performance than EXISTS subquery.
+
+
+For completeness its interesting to take a look at the execution plans the database engine generates. Here are Execution plans for input set of size 10 with person table containing 1000 records.
 
 ## ExistsStrategy ##
 ```

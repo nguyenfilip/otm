@@ -14,8 +14,8 @@ import org.postgresql.ds.PGSimpleDataSource;
 import nguyen.query.strategies.QueryStrategy;
 
 public class DatabaseManager {
-	private static final int PERSON_COUNT = 1000;
-	private static final int MAX_ADDRESS = 150;
+	private static final int PERSON_COUNT = 20000;
+	private static final int MAX_ADDRESS = 200;
 	private static final int MIN_ADDRESS = 100;
 
 	private Random rand = new Random();
@@ -71,17 +71,15 @@ public class DatabaseManager {
 		Statement st = con.createStatement();
 
 		try {
+			dropFkIndex();
 			st.execute("DROP TABLE address");
 			st.execute("DROP TABLE person");
-			dropFkIndex();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		st.execute("CREATE TABLE person(id SERIAL PRIMARY KEY, name varchar(40))");
-		st.execute(
-				"CREATE TABLE address(id SERIAL PRIMARY KEY, person_id integer REFERENCES person(id), street varchar(40))");
+		st.execute("CREATE TABLE address(id SERIAL PRIMARY KEY, person_id integer REFERENCES person(id), street varchar(40))");
 		createfkIndex();
-		
 		PreparedStatement personInsert = con.prepareStatement("INSERT INTO person values(?,?)");
 		PreparedStatement address = con.prepareStatement("INSERT INTO address (person_id, street) values(?,?)");
 		for (int i = 0; i < PERSON_COUNT; i++) {
